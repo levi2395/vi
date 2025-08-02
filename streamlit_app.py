@@ -3,44 +3,37 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-st.title("Zara Sales Forecast Dashboard")
+st.title("Dự báo doanh số theo tháng — Linear Regression")
 
-uploaded = st.file_uploader("Upload CSV data", type="csv")
-if uploaded:
-    df = pd.read_csv(uploaded, sep=";")
-    df['tanggal'] = pd.to_datetime(df['tanggal'])
-    df['bulan'] = df['tanggal'].dt.to_period('M').astype(str)
-    df_monthly = df.groupby('bulan')['pendapatan'].sum().reset_index()
+df = pd.DataFrame({
+    "Tháng": [1, 2, 3, 4, 5, 6],
+    "Doanh số": [10000, 15000, 17000, 16000, 18000, 20000]
+})
 
-    st.subheader("📊 Monthly Revenue")
-    st.line_chart(df_monthly.set_index('bulan')['pendapatan'])
+st.subheader("Dữ liệu doanh số (thực tế)")
+st.dataframe(df)
 
-    df_monthly['bulan_num'] = np.arange(len(df_monthly))
-    X, y = df_monthly[['bulan_num']], df_monthly['pendapatan']
-    model = LinearRegression().fit(X, y)
-    df_monthly['predicted'] = model.predict(X)
+X = df[["Tháng"]]
+y = df["Doanh số"]
+model = LinearRegression()
+model.fit(X, y)
+y_pred = model.predict(X)
 
-    st.subheader("🔮 Forecast Next Month")
-    next_idx = df_monthly['bulan_num'].max() + 1
-    forecast = model.predict([[next_idx]])[0]
-    st.write(f"Projected revenue: **{forecast:,.0f} VND**")
+fig, ax = plt.subplots()
+ax.plot(df["Tháng"], y, "bo-", label="Thực tế")
+ax.plot(df["Tháng"], y_pred, "kx--", label="Dự báo")
+ax.set_xlabel("Tháng")
+ax.set_ylabel("Doanh số")
+ax.legend()
+st.pyplot(fig)
 
-    st.subheader("📈 Model Performance")
-    mse = mean_squared_error(y, df_monthly['predicted'])
-    rmse = np.sqrt(mse)
-    r2 = r2_score(y, df_monthly['predicted'])
-    st.write(f"- RMSE: {rmse:.2f}")
-    st.write(f"- R² Score: {r2:.3f}")
+st.subheader("Chỉ số đánh giá mô hình")
+st.write(f"MAE: {mean_absolute_error(y, y_pred):.2f}")
+st.write(f"RMSE: {np.sqrt(mean_squared_error(y, y_pred)):.2f}")
+st.write(f"R²: {r2_score(y, y_pred):.2f}")
 
-    st.subheader("📉 Actual vs Forecast")
-    fig, ax = plt.subplots(figsize=(8,4))
-    ax.plot(df_monthly['bulan'], y, marker='o', label='Actual')
-    ax.plot(df_monthly['bulan'], df_monthly['predicted'], marker='x', label='Predicted')
-    ax.set_xlabel('Month')
-    ax.set_ylabel('Revenue')
-    ax.legend()
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
-
+new_month = st.slider("Chọn tháng mới để dự báo", 7, 12, 7)
+pred = model.predict([[new_month]])
+st.success(f"Dự báo doanh số tháng {new_month}: {pred[0]:.0f}")
