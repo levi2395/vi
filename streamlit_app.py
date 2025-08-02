@@ -3,107 +3,90 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 from io import StringIO
 
-# Cài đặt cấu hình trang
-st.set_page_config(
-    page_title="Streamlit Data Visualization",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+def create_bar_chart(df, column, title, xlabel, ylabel, rotation=0, color='skyblue'):
+    """
+    Tạo biểu đồ cột từ DataFrame.
+    """
+    fig, ax = plt.subplots(figsize=(10, 4))
+    df[column].value_counts().head(10).plot(kind='bar', ax=ax, color=color)
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel(xlabel)
+    ax.tick_params(axis='x', rotation=rotation)
+    st.pyplot(fig)
 
-# Tiêu đề của ứng dụng
-st.title("Ứng dụng trực quan hóa dữ liệu")
-st.markdown("Sử dụng các thư viện `pandas`, `matplotlib`, và `seaborn`.")
+def create_pie_chart(df, column, title):
+    """
+    Tạo biểu đồ tròn từ DataFrame.
+    """
+    fig, ax = plt.subplots()
+    df[column].value_counts().plot(kind='pie', autopct='%1.1f%%', ax=ax)
+    ax.set_title(title)
+    ax.set_ylabel('')
+    st.pyplot(fig)
 
-# Tải lên tệp CSV
-uploaded_file = st.file_uploader("Tải lên tệp CSV", type=["csv"])
+def create_histogram(df, column, title, xlabel, ylabel, color='orange'):
+    """
+    Tạo biểu đồ histogram từ DataFrame.
+    """
+    fig, ax = plt.subplots()
+    sns.histplot(df[column], kde=True, ax=ax, color=color)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    st.pyplot(fig)
 
-if uploaded_file is not None:
+def create_sales_volume_chart(df, groupby_col, title, xlabel, ylabel, rotation=0, color='green'):
+    """
+    Tạo biểu đồ doanh số trung bình.
+    """
+    fig, ax = plt.subplots()
+    df.groupby(groupby_col)['Sales Volume'].mean().plot(kind='bar', ax=ax, color=color)
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel(xlabel)
+    ax.tick_params(axis='x', rotation=rotation)
+    st.pyplot(fig)
+
+# Cấu hình trang Streamlit
+st.set_page_config(page_title="Zara Data Visualization", layout="wide")
+st.title("🛍️ Zara Fashion Sales Dashboard")
+
+# Tải lên file CSV
+uploaded_file = st.file_uploader("📤 Tải lên file Zara (.csv)", type=["csv"])
+
+if uploaded_file:
     try:
-        # Đọc dữ liệu từ tệp đã tải lên
-        df = pd.read_csv(uploaded_file)
+        # Đọc dữ liệu từ file đã tải lên.
+        # Sử dụng `StringIO` để xử lý tệp trong bộ nhớ.
+        # Căn cứ vào file bạn đã gửi, dấu phân cách là ';'.
+        df = pd.read_csv(uploaded_file, sep=';')
         
         st.success("Tải tệp lên thành công!")
 
-        # Hiển thị 5 dòng đầu tiên của dữ liệu
-        st.subheader("Xem trước dữ liệu")
+        # Xem trước dữ liệu
+        st.subheader("🔍 Xem trước dữ liệu")
         st.dataframe(df.head())
 
-        # Hiển thị thông tin về dữ liệu
-        st.subheader("Thông tin về DataFrame")
-        buffer = StringIO()
-        df.info(buf=buffer)
-        s = buffer.getvalue()
-        st.text(s)
+        st.subheader("📊 Biểu đồ trực quan hóa dữ liệu")
 
-        # Lọc dữ liệu bằng thanh trượt
-        st.sidebar.header("Lọc dữ liệu")
-        selected_column = st.sidebar.selectbox("Chọn cột số:", df.select_dtypes(include=np.number).columns)
+        # 1. Top 10 danh mục sản phẩm phổ biến
+        create_bar_chart(df, 'Product Category', '1. Top 10 danh mục sản phẩm phổ biến', 'Danh mục sản phẩm', 'Số lượng', rotation=45, color='teal')
+
+        # 2. Phân bố khuyến mãi (Promotion)
+        create_pie_chart(df, 'Promotion', '2. Tỉ lệ khuyến mãi (Promotion)')
+
+        # 3. Phân loại theo section (MAN, WOMAN)
+        create_bar_chart(df, 'section', '3. Phân loại người mua (Section)', 'Phân loại', 'Số lượng', color='skyblue')
+
+        # 4. Phân bố giá sản phẩm
+        create_histogram(df, 'price', '4. Phân bố giá sản phẩm', 'Giá sản phẩm', 'Tần suất')
+
+        # 5. Doanh số theo vị trí trưng bày
+        create_sales_volume_chart(df, 'Product Position', '5. Doanh số theo vị trí trưng bày', 'Vị trí trưng bày', 'Doanh số trung bình', rotation=45)
         
-        if selected_column:
-            min_val = float(df[selected_column].min())
-            max_val = float(df[selected_column].max())
-            filter_value = st.sidebar.slider(
-                f"Lọc theo {selected_column}",
-                min_value=min_val,
-                max_value=max_val,
-                value=(min_val, max_val)
-            )
-            df_filtered = df[(df[selected_column] >= filter_value[0]) & (df[selected_column] <= filter_value[1])]
-            
-            st.subheader(f"Dữ liệu đã lọc theo '{selected_column}'")
-            st.dataframe(df_filtered)
-
-            # Các biểu đồ trực quan hóa
-            st.header("Trực quan hóa dữ liệu")
-
-            # Biểu đồ 1: Biểu đồ phân bố (Histogram)
-            st.subheader(f"Biểu đồ phân bố của '{selected_column}'")
-            fig, ax = plt.subplots()
-            sns.histplot(df_filtered[selected_column], kde=True, ax=ax)
-            ax.set_title(f"Phân bố của {selected_column}")
-            st.pyplot(fig)
-
-            # Biểu đồ 2: Biểu đồ thanh (Bar Chart)
-            st.subheader("Biểu đồ thanh")
-            # Tìm một cột đối tượng (object) để tạo biểu đồ
-            object_cols = df_filtered.select_dtypes(include=['object']).columns
-            if len(object_cols) > 0:
-                selected_bar_col = st.selectbox("Chọn cột cho biểu đồ thanh:", object_cols)
-                if selected_bar_col:
-                    fig, ax = plt.subplots()
-                    df_filtered[selected_bar_col].value_counts().plot(kind='bar', ax=ax)
-                    ax.set_title(f"Số lượng theo {selected_bar_col}")
-                    st.pyplot(fig)
-            else:
-                st.info("Không tìm thấy cột đối tượng để tạo biểu đồ thanh.")
-            
-            # Biểu đồ 3: Biểu đồ hộp (Box Plot)
-            st.subheader("Biểu đồ hộp")
-            if len(object_cols) > 0:
-                selected_box_col = st.selectbox("Chọn cột cho trục X của biểu đồ hộp:", object_cols)
-                if selected_box_col:
-                    fig, ax = plt.subplots()
-                    sns.boxplot(x=selected_box_col, y=selected_column, data=df_filtered, ax=ax)
-                    ax.set_title(f"Phân bố của {selected_column} theo {selected_box_col}")
-                    st.pyplot(fig)
-            else:
-                st.info("Không tìm thấy cột đối tượng để tạo biểu đồ hộp.")
-
-            # Biểu đồ 4: Biểu đồ mối tương quan (Heatmap)
-            st.subheader("Biểu đồ mối tương quan")
-            numeric_df = df_filtered.select_dtypes(include=np.number)
-            if not numeric_df.empty and numeric_df.shape[1] > 1:
-                fig, ax = plt.subplots(figsize=(10, 8))
-                sns.heatmap(numeric_df.corr(), annot=True, fmt=".2f", cmap='coolwarm', ax=ax)
-                ax.set_title("Biểu đồ mối tương quan giữa các cột số")
-                st.pyplot(fig)
-            else:
-                st.info("Không đủ cột số để tạo biểu đồ mối tương quan.")
-
     except Exception as e:
-        st.error(f"Đã xảy ra lỗi khi xử lý tệp: {e}")
-        st.info("Vui lòng đảm bảo tệp của bạn là CSV hợp lệ và không bị lỗi.")
-
+        st.error(f"Đã xảy ra lỗi khi đọc file CSV: {e}")
+        st.info("Vui lòng đảm bảo file CSV của bạn có dấu phân cách là ';' và chứa các cột cần thiết.")
