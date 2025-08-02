@@ -1,114 +1,75 @@
+# streamlit_app.py
+
 import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
 
-st.set_page_config(page_title="Zara Sales Dashboard", layout="wide")
-sns.set(style="whitegrid")
+st.set_page_config(page_title="Zara Sales Forecast", layout="centered")
 
-st.title("🛍️ Zara Sales Dashboard")
-st.markdown("Phân tích dữ liệu sản phẩm Zara: thương hiệu, danh mục, mùa vụ và doanh số.")
+st.title("📈 Zara Sales Forecast Dashboard")
 
-# ----------------------------
-# Upload dữ liệu
-# ----------------------------
-st.sidebar.header("📂 Tải dữ liệu CSV")
-file = st.sidebar.file_uploader("Tải file dữ liệu .csv", type=["csv"])
+st.markdown("""
+Ứng dụng dự báo doanh thu bán hàng Zara theo tháng.
+- Upload file dữ liệu (*.csv)
+- Trực quan hóa dữ liệu
+- Dự báo doanh thu tháng tiếp theo
+""")
 
-if file:
-    df = pd.read_csv(file)
+# 1. Upload file
+uploaded_file = st.file_uploader("📂 Tải lên file Zara CSV", type="csv")
 
-    st.success("✅ Dữ liệu đã được tải thành công.")
-    st.dataframe(df.head(), use_container_width=True)
+if uploaded_file:
+    # 2. Đọc dữ liệu
+    df = pd.read_csv(uploaded_file, sep=";")
+    df['tanggal'] = pd.to_datetime(df['tanggal'])
+    df['bulan'] = df['tanggal'].dt.to_period('M').astype(str)
 
-    # Tabs phân tích
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📊 Thương hiệu",
-        "📁 Danh mục sản phẩm",
-        "🌦️ Mùa vụ",
-        "📈 Doanh số & Giá"
-    ])
+    st.subheader("🧾 Dữ liệu đầu vào")
+    st.dataframe(df.head())
 
-    # ====================================
-    # Tab 1: Thương hiệu
-    # ====================================
-    with tab1:
-        st.subheader("Top 10 Thương hiệu có nhiều sản phẩm nhất")
-        if 'brand' in df.columns:
-            brand_counts = df['brand'].value_counts().head(10)
-            fig1, ax1 = plt.subplots(figsize=(10, 4))
-            sns.barplot(x=brand_counts.index, y=brand_counts.values, palette='viridis', ax=ax1)
-            ax1.set_title("Top 10 Thương hiệu")
-            ax1.set_ylabel("Số lượng sản phẩm")
-            ax1.tick_params(axis='x', rotation=45)
-            st.pyplot(fig1)
-        else:
-            st.warning("Không có cột 'brand' trong dữ liệu.")
+    # 3. Doanh thu theo tháng
+    df_monthly = df.groupby('bulan')['pendapatan'].sum().reset_index()
+    df_monthly['bulan_num'] = np.arange(len(df_monthly))
 
-    # ====================================
-    # Tab 2: Danh mục sản phẩm
-    # ====================================
-    with tab2:
-        st.subheader("Giá trung bình theo danh mục sản phẩm")
-        if 'Product Category' in df.columns and 'price' in df.columns:
-            avg_price = df.groupby("Product Category")['price'].mean().sort_values(ascending=False).head(10)
-            fig2, ax2 = plt.subplots(figsize=(10, 4))
-            sns.barplot(x=avg_price.index, y=avg_price.values, palette='magma', ax=ax2)
-            ax2.set_ylabel("Giá trung bình")
-            ax2.set_xlabel("Danh mục")
-            ax2.tick_params(axis='x', rotation=45)
-            ax2.set_title("Top 10 Danh mục theo giá trung bình")
-            st.pyplot(fig2)
-        else:
-            st.warning("Không tìm thấy cột 'Product Category' hoặc 'price'.")
+    st.subheader("📊 Doanh thu theo Tháng")
+    st.line_chart(df_monthly.set_index('bulan')['pendapatan'])
 
-    # ====================================
-    # Tab 3: Mùa vụ
-    # ====================================
-    with tab3:
-        st.subheader("Phân bố doanh số theo mùa vụ")
-        if 'Seasonal' in df.columns and 'Sales Volume' in df.columns:
-            fig3, ax3 = plt.subplots(figsize=(8, 4))
-            sns.boxplot(data=df, x='Seasonal', y='Sales Volume', palette='Set2', ax=ax3)
-            ax3.set_title("Boxplot doanh số theo mùa vụ")
-            ax3.set_xlabel("Mùa vụ")
-            ax3.set_ylabel("Sales Volume")
-            st.pyplot(fig3)
-        else:
-            st.warning("Không tìm thấy cột 'Seasonal' hoặc 'Sales Volume'.")
+    # 4. Huấn luyện mô hình Linear Regression
+    X = df_monthly[['bulan_num']]
+    y = df_monthly['pendapatan']
+    model = LinearRegression()
+    model.fit(X, y)
+    df_monthly['predicted'] = model.predict(X)
 
-    # ====================================
-    # Tab 4: Doanh số & Giá theo thời gian
-    # ====================================
-    with tab4:
-        col1, col2 = st.columns(2)
+    # 5. Dự báo tháng tiếp theo
+    next_index = df_monthly['bulan_num'].max() + 1
+    next_month = pd.Period(df_monthly['bulan'].iloc[-1], freq='M') + 1
+    forecast = model.predict([[next_index]])[0]
 
-        with col1:
-            st.subheader("Phân phối doanh số")
-            if 'Sales Volume' in df.columns:
-                fig4, ax4 = plt.subplots(figsize=(8, 4))
-                sns.histplot(df['Sales Volume'], kde=True, color='skyblue', ax=ax4)
-                ax4.set_title("Phân phối Sales Volume")
-                ax4.set_xlabel("Sales Volume")
-                st.pyplot(fig4)
-            else:
-                st.warning("Không có cột 'Sales Volume'.")
+    st.subheader("🔮 Dự báo doanh thu tháng kế tiếp")
+    st.write(f"📅 Tháng: **{next_month}**")
+    st.write(f"💰 Dự báo doanh thu: **{forecast:,.0f} VND**")
 
-        with col2:
-            st.subheader("Xu hướng giá theo thời gian")
-            if 'scraped_at' in df.columns and 'price' in df.columns:
-                df['scraped_at'] = pd.to_datetime(df['scraped_at'], errors='coerce')
-                price_by_time = df.groupby('scraped_at')['price'].mean().reset_index()
+    # 6. Đánh giá mô hình
+    st.subheader("📈 Đánh giá mô hình")
+    rmse = np.sqrt(mean_squared_error(y, df_monthly['predicted']))
+    r2 = r2_score(y, df_monthly['predicted'])
+    st.metric("RMSE", f"{rmse:,.2f}")
+    st.metric("R² Score", f"{r2:.3f}")
 
-                fig5, ax5 = plt.subplots(figsize=(8, 4))
-                sns.lineplot(data=price_by_time, x='scraped_at', y='price', marker='o', ax=ax5)
-                ax5.set_title("Giá trung bình theo thời gian")
-                ax5.set_ylabel("Giá trung bình")
-                ax5.set_xlabel("Thời gian")
-                ax5.tick_params(axis='x', rotation=45)
-                st.pyplot(fig5)
-            else:
-                st.warning("Không tìm thấy cột 'scraped_at' hoặc 'price'.")
+    # 7. Biểu đồ Thực tế vs Dự báo
+    st.subheader("📉 Thực tế vs Dự báo")
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.plot(df_monthly['bulan'], y, marker='o', label='Thực tế')
+    ax.plot(df_monthly['bulan'], df_monthly['predicted'], marker='x', label='Dự báo')
+    ax.set_xlabel("Tháng")
+    ax.set_ylabel("Doanh thu")
+    ax.legend()
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
 
 else:
-    st.info("📌 Vui lòng tải lên file dữ liệu CSV để bắt đầu.")
+    st.info("Vui lòng tải file CSV để bắt đầu.")
