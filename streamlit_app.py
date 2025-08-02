@@ -43,5 +43,4 @@ if uploaded:
     ax.legend()
     plt.xticks(rotation=45)
     st.pyplot(fig)
-else:
-    st.info("Please upload the Zara sales CSV file.")
+
